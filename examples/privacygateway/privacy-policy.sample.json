@@ -1,0 +1,25 @@
+{
+  "block_keywords": [
+    "Apollo-X",
+    "internal-only-project"
+  ],
+  "mask_keywords": [
+    "customer-alpha",
+    "staging-cluster"
+  ],
+  "custom_detectors": [
+    {
+      "name": "ticket_id",
+      "pattern": "TICKET-[0-9]+",
+      "level": "P3",
+      "action": "placeholder",
+      "placeholder": "TICKET"
+    },
+    {
+      "name": "internal_case_id",
+      "pattern": "CASE-[A-Z0-9-]+",
+      "level": "P3",
+      "action": "block"
+    }
+  ]
+}
