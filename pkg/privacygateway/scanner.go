@@ -38,6 +38,7 @@ func NewScanner() *Scanner {
 type ScanResult struct {
 	Text         string
 	Redactions   []Redaction
+	Bindings     []PlaceholderBinding
 	RiskLevel    PrivacyLevel
 	Blocked      bool
 	BlockReasons []string
@@ -62,7 +63,9 @@ func (s *Scanner) Redact(input string) ScanResult {
 				placeholderPrefix = strings.ToUpper(d.name)
 			}
 			redaction.Placeholder = "{" + placeholderPrefix + "}"
-			result.Text = replaceMatches(result.Text, d.pattern, placeholderPrefix)
+			var bindings []PlaceholderBinding
+			result.Text, bindings = replaceMatches(result.Text, d.pattern, placeholderPrefix, d)
+			result.Bindings = append(result.Bindings, bindings...)
 		}
 		result.Redactions = append(result.Redactions, redaction)
 	}
@@ -70,18 +73,26 @@ func (s *Scanner) Redact(input string) ScanResult {
 	return result
 }
 
-func replaceMatches(input string, pattern *regexp.Regexp, placeholderPrefix string) string {
+func replaceMatches(input string, pattern *regexp.Regexp, placeholderPrefix string, d detector) (string, []PlaceholderBinding) {
 	seen := map[string]string{}
 	counter := 0
-	return pattern.ReplaceAllStringFunc(input, func(match string) string {
+	bindings := []PlaceholderBinding{}
+	output := pattern.ReplaceAllStringFunc(input, func(match string) string {
 		if ph, ok := seen[match]; ok {
 			return ph
 		}
 		counter++
 		ph := "{" + placeholderPrefix + "_" + itoa(counter) + "}"
 		seen[match] = ph
+		bindings = append(bindings, PlaceholderBinding{
+			Placeholder: ph,
+			RawValue:    match,
+			Type:        d.name,
+			Level:       d.level,
+		})
 		return ph
 	})
+	return output, bindings
 }
 
 func mergeRedactions(items []Redaction) []Redaction {
