@@ -30,6 +30,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/healthz", s.handleHealth)
 	mux.HandleFunc("/v1/privacy/compile", s.handleCompile)
 	mux.HandleFunc("/v1/privacy/approve", s.handleApprove)
+	mux.HandleFunc("/v1/privacy/export-prompt", s.handleExportPrompt)
 	mux.HandleFunc("/v1/privacy/rehydrate", s.handleRehydrate)
 	mux.HandleFunc("/v1/privacy/external/response-check", s.handleResponseCheck)
 	mux.HandleFunc("/v1/privacy/vault/put", s.handleVaultPut)
@@ -94,6 +95,44 @@ func (s *Server) handleApprove(w http.ResponseWriter, r *http.Request) {
 		RequestID: session.RequestID,
 		Approved:  session.Approved,
 		Decision:  session.Response.Decision,
+	})
+}
+
+func (s *Server) handleExportPrompt(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	var req ExportPromptRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
+		return
+	}
+	session, ok := s.Store.Get(req.RequestID)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "privacy session not found"})
+		return
+	}
+	if session.Response.Decision == DecisionBlock || session.Response.Decision == DecisionLocalOnly {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "session is not eligible for external prompt export"})
+		return
+	}
+	if session.Response.Decision == DecisionReview && !session.Approved {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "user approval is required before exporting external prompt"})
+		return
+	}
+	if session.Response.ExternalPrompt == "" {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "no external prompt available"})
+		return
+	}
+	if s.Audit != nil {
+		s.Audit(NewAuditEvent("privacy_export_prompt", session.Response))
+	}
+	writeJSON(w, http.StatusOK, ExportPromptResponse{
+		RequestID:      session.RequestID,
+		ExternalPrompt: session.Response.ExternalPrompt,
+		Decision:       session.Response.Decision,
+		RiskLevel:      session.Response.RiskLevel,
 	})
 }
 
