@@ -1,0 +1,6 @@
+{
+  "user_input": "Help me write a message to tom@example.com about Java 21 virtual threads troubleshooting. The internal service URL is http://service.internal/api/jobs.",
+  "need_external": true,
+  "output_format": "concise markdown",
+  "dry_run": true
+}
