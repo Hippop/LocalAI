@@ -13,6 +13,7 @@ func TestServerExportPromptRequiresApprovalForReviewDecision(t *testing.T) {
 	handler := srv.Routes()
 
 	compileBody := `{"user_input":"Help with a public Java question for tom@example.com","need_external":true}`
+	compileBody = `{"user_input":"Help with a public Java question for tom@example.com","need_external":true}`
 	compileReq := httptest.NewRequest(http.MethodPost, "/v1/privacy/compile", bytes.NewBufferString(compileBody))
 	compileReq.Header.Set("Content-Type", "application/json")
 	compileRec := httptest.NewRecorder()
