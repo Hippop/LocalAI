@@ -10,6 +10,7 @@ func NewAuditEvent(event string, res CompileResponse) AuditEvent {
 	return AuditEvent{
 		Event:            event,
 		Time:             time.Now().UTC(),
+		RequestID:        res.RequestID,
 		Decision:         res.Decision,
 		RiskLevel:        res.RiskLevel,
 		RedactionSummary: summary,
