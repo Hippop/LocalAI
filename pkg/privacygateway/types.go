@@ -32,6 +32,15 @@ type Redaction struct {
 	Action      string       `json:"action"`
 }
 
+// PlaceholderBinding is local-only state used by the rehydration engine. Raw
+// values must never be returned by API handlers or sent to the public zone.
+type PlaceholderBinding struct {
+	Placeholder string       `json:"placeholder"`
+	RawValue    string       `json:"-"`
+	Type        string       `json:"type"`
+	Level       PrivacyLevel `json:"level"`
+}
+
 // CompileRequest is the input to the privacy compiler. UserInput is allowed to
 // contain raw private information because this endpoint is intended to run only
 // inside the no-network private zone.
@@ -47,6 +56,7 @@ type CompileRequest struct {
 // CompileResponse contains only sanitized information that may be shown in an
 // external-call preview. It intentionally never returns raw private findings.
 type CompileResponse struct {
+	RequestID      string       `json:"request_id,omitempty"`
 	Decision       Decision     `json:"decision"`
 	RiskLevel      PrivacyLevel `json:"risk_level"`
 	ExternalPrompt string       `json:"external_prompt,omitempty"`
@@ -54,6 +64,35 @@ type CompileResponse struct {
 	Redactions     []Redaction  `json:"redactions"`
 	Reasons        []string     `json:"reasons"`
 	RequiresReview bool         `json:"requires_review"`
+}
+
+// ApprovalRequest records explicit user approval for a review decision.
+type ApprovalRequest struct {
+	RequestID string `json:"request_id"`
+	Approved  bool   `json:"approved"`
+	Reason    string `json:"reason,omitempty"`
+}
+
+// ApprovalResponse is returned after a user approval decision is stored.
+type ApprovalResponse struct {
+	RequestID string   `json:"request_id"`
+	Approved  bool     `json:"approved"`
+	Decision  Decision `json:"decision"`
+}
+
+// RehydrateRequest replaces local-only placeholders in external output after
+// the response checker has accepted the content as untrusted reference data.
+type RehydrateRequest struct {
+	RequestID       string `json:"request_id"`
+	ExternalContent string `json:"external_content"`
+}
+
+// RehydrateResponse is safe to show only to the local user. It may contain raw
+// private data after placeholders are restored.
+type RehydrateResponse struct {
+	RequestID string   `json:"request_id"`
+	Content   string   `json:"content"`
+	Warnings  []string `json:"warnings,omitempty"`
 }
 
 // ResponseCheckRequest checks untrusted external model/search output before it
@@ -76,6 +115,7 @@ type ResponseCheckResponse struct {
 type AuditEvent struct {
 	Event             string            `json:"event"`
 	Time              time.Time         `json:"time"`
+	RequestID         string            `json:"request_id,omitempty"`
 	Decision          Decision          `json:"decision"`
 	RiskLevel         PrivacyLevel      `json:"risk_level"`
 	RedactionSummary  map[string]int    `json:"redaction_summary"`
