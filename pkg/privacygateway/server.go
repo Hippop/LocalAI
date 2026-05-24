@@ -10,6 +10,7 @@ import (
 type Server struct {
 	Policy *PolicyEngine
 	Store  *SessionStore
+	Vault  *EncryptedMemoryVault
 	Audit  func(AuditEvent)
 }
 
@@ -31,6 +32,10 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/privacy/approve", s.handleApprove)
 	mux.HandleFunc("/v1/privacy/rehydrate", s.handleRehydrate)
 	mux.HandleFunc("/v1/privacy/external/response-check", s.handleResponseCheck)
+	mux.HandleFunc("/v1/privacy/vault/put", s.handleVaultPut)
+	mux.HandleFunc("/v1/privacy/vault/get", s.handleVaultGet)
+	mux.HandleFunc("/v1/privacy/vault/list", s.handleVaultList)
+	mux.HandleFunc("/v1/privacy/vault/delete", s.handleVaultDelete)
 	return mux
 }
 
@@ -143,6 +148,106 @@ func (s *Server) handleResponseCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, CheckExternalResponse(req))
+}
+
+func (s *Server) handleVaultPut(w http.ResponseWriter, r *http.Request) {
+	if !s.requireVault(w) {
+		return
+	}
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	var req VaultPutRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
+		return
+	}
+	record, err := s.Vault.Put(req)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	if s.Audit != nil {
+		s.Audit(AuditEvent{Event: "vault_put", RawContentLogged: false, AdditionalContext: map[string]string{"key": record.Key}})
+	}
+	record.Value = ""
+	writeJSON(w, http.StatusOK, record)
+}
+
+func (s *Server) handleVaultGet(w http.ResponseWriter, r *http.Request) {
+	if !s.requireVault(w) {
+		return
+	}
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	var req VaultGetRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
+		return
+	}
+	record, err := s.Vault.Get(req.Key)
+	if errors.Is(err, ErrVaultRecordNotFound) {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "vault record not found"})
+		return
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to read vault record"})
+		return
+	}
+	if s.Audit != nil {
+		s.Audit(AuditEvent{Event: "vault_get", RawContentLogged: false, AdditionalContext: map[string]string{"key": record.Key}})
+	}
+	writeJSON(w, http.StatusOK, record)
+}
+
+func (s *Server) handleVaultList(w http.ResponseWriter, r *http.Request) {
+	if !s.requireVault(w) {
+		return
+	}
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	records, err := s.Vault.List()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list vault"})
+		return
+	}
+	writeJSON(w, http.StatusOK, VaultListResponse{Records: records})
+}
+
+func (s *Server) handleVaultDelete(w http.ResponseWriter, r *http.Request) {
+	if !s.requireVault(w) {
+		return
+	}
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+	var req VaultDeleteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
+		return
+	}
+	if err := s.Vault.Delete(req.Key); errors.Is(err, ErrVaultRecordNotFound) {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "vault record not found"})
+		return
+	} else if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to delete vault record"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+func (s *Server) requireVault(w http.ResponseWriter) bool {
+	if s.Vault == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "memory vault is not configured"})
+		return false
+	}
+	return true
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
