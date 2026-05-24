@@ -80,6 +80,21 @@ type ApprovalResponse struct {
 	Decision  Decision `json:"decision"`
 }
 
+// ExportPromptRequest asks the private gateway to release a sanitized external
+// prompt after policy and approval gates are satisfied.
+type ExportPromptRequest struct {
+	RequestID string `json:"request_id"`
+}
+
+// ExportPromptResponse contains a sanitized prompt that may be sent to the
+// public-zone external gateway. It must never contain raw private values.
+type ExportPromptResponse struct {
+	RequestID      string       `json:"request_id"`
+	ExternalPrompt string       `json:"external_prompt"`
+	Decision       Decision     `json:"decision"`
+	RiskLevel      PrivacyLevel `json:"risk_level"`
+}
+
 // RehydrateRequest replaces local-only placeholders in external output after
 // the response checker has accepted the content as untrusted reference data.
 type RehydrateRequest struct {
