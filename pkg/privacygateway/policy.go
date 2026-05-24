@@ -14,6 +14,11 @@ func NewPolicyEngine() *PolicyEngine {
 }
 
 func (p *PolicyEngine) Compile(req CompileRequest) CompileResponse {
+	res, _ := p.CompileWithBindings(req)
+	return res
+}
+
+func (p *PolicyEngine) CompileWithBindings(req CompileRequest) (CompileResponse, []PlaceholderBinding) {
 	input := strings.TrimSpace(req.UserInput)
 	if req.Task != "" {
 		input = strings.TrimSpace(req.Task) + "\n\n" + input
@@ -26,7 +31,7 @@ func (p *PolicyEngine) Compile(req CompileRequest) CompileResponse {
 			SafeSummary:    "empty input",
 			Reasons:        []string{"empty input is not useful for local or external processing"},
 			RequiresReview: false,
-		}
+		}, nil
 	}
 
 	scan := p.Scanner.Redact(input)
@@ -40,13 +45,13 @@ func (p *PolicyEngine) Compile(req CompileRequest) CompileResponse {
 		res.Decision = DecisionBlock
 		res.Reasons = append(res.Reasons, scan.BlockReasons...)
 		res.RequiresReview = true
-		return res
+		return res, scan.Bindings
 	}
 
 	if !req.NeedExternal {
 		res.Decision = DecisionLocalOnly
 		res.Reasons = []string{"external capability was not requested; keep task in private zone"}
-		return res
+		return res, scan.Bindings
 	}
 
 	if scan.RiskLevel == PrivacyLevelSensitive || scan.RiskLevel == PrivacyLevelPersonal {
@@ -59,7 +64,7 @@ func (p *PolicyEngine) Compile(req CompileRequest) CompileResponse {
 	}
 
 	res.ExternalPrompt = buildExternalPrompt(scan.Text, req.OutputFormat)
-	return res
+	return res, scan.Bindings
 }
 
 func buildExternalPrompt(redactedTask string, outputFormat string) string {
