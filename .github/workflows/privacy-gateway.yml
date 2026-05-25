@@ -1,0 +1,43 @@
+name: privacy-gateway
+
+on:
+  pull_request:
+    paths:
+      - 'pkg/privacygateway/**'
+      - 'cmd/privacy-gateway/**'
+      - 'cmd/privacy-gateway-config/**'
+      - 'cmd/external-gateway/**'
+      - 'cmd/privacy-sandbox-check/**'
+      - '.github/workflows/privacy-gateway.yml'
+  push:
+    branches:
+      - master
+    paths:
+      - 'pkg/privacygateway/**'
+      - 'cmd/privacy-gateway/**'
+      - 'cmd/privacy-gateway-config/**'
+      - 'cmd/external-gateway/**'
+      - 'cmd/privacy-sandbox-check/**'
+      - '.github/workflows/privacy-gateway.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Test privacy gateway package
+        run: go test ./pkg/privacygateway
+
+      - name: Build privacy gateway commands
+        run: |
+          go build ./cmd/privacy-gateway
+          go build ./cmd/privacy-gateway-config
+          go build ./cmd/external-gateway
+          go build ./cmd/privacy-sandbox-check
