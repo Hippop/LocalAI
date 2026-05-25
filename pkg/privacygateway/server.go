@@ -60,11 +60,17 @@ func (s *Server) handleCompile(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create privacy session"})
 		return
 	}
-	res = session.Response
 	if s.Audit != nil {
-		s.Audit(NewAuditEvent("privacy_compile", res))
+		s.Audit(NewAuditEvent("privacy_compile", session.Response))
 	}
-	writeJSON(w, http.StatusOK, res)
+	writeJSON(w, http.StatusOK, previewCompileResponse(session.Response))
+}
+
+func previewCompileResponse(res CompileResponse) CompileResponse {
+	if res.Decision == DecisionReview {
+		res.ExternalPrompt = ""
+	}
+	return res
 }
 
 func (s *Server) handleApprove(w http.ResponseWriter, r *http.Request) {
