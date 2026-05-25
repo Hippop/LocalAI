@@ -23,15 +23,18 @@ type Scanner struct {
 
 func NewScanner() *Scanner {
 	return &Scanner{detectors: []detector{
+		// Blockers must run before masking detectors. Otherwise a long secret-like
+		// digit sequence could be partially masked as a phone number before the
+		// secret detector has a chance to block it.
 		{name: "private_key", level: PrivacyLevelSecret, action: "block", block: true, pattern: regexp.MustCompile(`(?is)-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----.*?-----END (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----`)},
 		{name: "api_key_or_token", level: PrivacyLevelSecret, action: "block", block: true, pattern: regexp.MustCompile(`(?i)\b(?:api[_-]?key|secret|token|access[_-]?token|refresh[_-]?token|password|passwd|pwd)\b\s*[:=]\s*['\"]?[^\s'\"]{8,}`)},
 		{name: "bearer_token", level: PrivacyLevelSecret, action: "block", block: true, pattern: regexp.MustCompile(`(?i)\bbearer\s+[a-z0-9._~+/=-]{16,}`)},
+		{name: "id_card_like", level: PrivacyLevelSecret, action: "block", block: true, pattern: regexp.MustCompile(`\b\d{15}(?:\d{2}[0-9Xx])?\b`)},
+		{name: "credit_card_like", level: PrivacyLevelSecret, action: "block", block: true, pattern: regexp.MustCompile(`\b(?:\d[ -]*?){13,19}\b`)},
 		{name: "email", level: PrivacyLevelPersonal, action: "placeholder", placeholder: "EMAIL", pattern: regexp.MustCompile(`\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b`)},
 		{name: "phone", level: PrivacyLevelPersonal, action: "placeholder", placeholder: "PHONE", pattern: regexp.MustCompile(`(?m)(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{2,4}\)?[\s.-]?)?\d{3,4}[\s.-]?\d{4}\b`)},
 		{name: "internal_url", level: PrivacyLevelSensitive, action: "placeholder", placeholder: "INTERNAL_URL", pattern: regexp.MustCompile(`(?i)\bhttps?://(?:localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|[^\s/]*\.(?:local|internal|intranet|corp))(?:/[^\s]*)?`)},
 		{name: "file_path", level: PrivacyLevelSensitive, action: "placeholder", placeholder: "FILE_PATH", pattern: regexp.MustCompile(`(?m)(?:/[A-Za-z0-9._\-]+){2,}|[A-Za-z]:\\(?:[^\\\r\n]+\\?){2,}`)},
-		{name: "id_card_like", level: PrivacyLevelSecret, action: "block", block: true, pattern: regexp.MustCompile(`\b\d{15}(?:\d{2}[0-9Xx])?\b`)},
-		{name: "credit_card_like", level: PrivacyLevelSecret, action: "block", block: true, pattern: regexp.MustCompile(`\b(?:\d[ -]*?){13,19}\b`)},
 	}}
 }
 
